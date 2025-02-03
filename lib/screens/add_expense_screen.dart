@@ -1,11 +1,9 @@
-import 'dart:convert';
-
-import 'package:expense_tracker/api_constan.dart';
-import 'package:expense_tracker/screens/home_screen.dart';
-import 'package:expense_tracker/screens/utils/snack_bar.dart';
+import 'package:intl/intl.dart';
+import 'package:expense_tracker/providers/expense_provider.dart';
+import 'package:expense_tracker/utils/snack_bar.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:http/http.dart' as http;
+
+import 'package:provider/provider.dart';
 
 class AddExpenseScreen extends StatefulWidget {
   const AddExpenseScreen({super.key});
@@ -17,43 +15,53 @@ class AddExpenseScreen extends StatefulWidget {
 class _AddExpenseScreenState extends State<AddExpenseScreen> {
   final _formKey = GlobalKey<FormState>();
   final _amountController = TextEditingController();
-  final _categoryController = TextEditingController();
-  final _dateController = TextEditingController();
+  String _selectedCategory = 'Food';
+  DateTime _selectedDate = DateTime.now();
   final _notesController = TextEditingController();
-  final _storage = FlutterSecureStorage();
 
-  Future<void> _addExpense() async {
-    if (_formKey.currentState!.validate()) {
-      final token = await _storage.read(key: 'jwt_token');
-      final response =
-          await http.post(Uri.parse('${ApiConstant.baseUrl}/api/expense/add'),
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer $token',
-              },
-              body: jsonEncode({
-                'amount': double.parse(_amountController.text),
-                'category': _categoryController.text,
-                'date': _dateController.text,
-                'notes': _notesController.text,
-              }));
-      if (response.statusCode == 200) {
-        showSnackBar(context, 'Expense added successfully',
-            backgroundColor: Colors.green);
-        Navigator.pushReplacementNamed(context, '/home');
-      } else {
-        showSnackBar(context, 'Failed to add expense',
-            backgroundColor: Colors.red);
-      }
+  Future<void> _selectDate(BuildContext context) async {
+    final pickedDate = await showDatePicker(
+        context: context,
+        initialDate: _selectedDate,
+        firstDate: DateTime(2000),
+        lastDate: DateTime.now());
+    if (pickedDate != null) {
+      setState(() {
+        _selectedDate = pickedDate;
+      });
+    }
+  }
+
+  void _submitExpense() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    final provider = Provider.of<ExpenseProvider>(context, listen: false);
+    bool success = await provider.addExpense(
+      double.parse(_amountController.text),
+      _selectedCategory,
+      DateFormat('yyyy-MM-dd').format(_selectedDate),
+      _notesController.text.isEmpty ? null : _notesController.text,
+    );
+    if (success) {
+      showSnackBar(context, 'Expense added successfully',
+          backgroundColor: Colors.green);
+      _amountController.clear();
+      _notesController.clear();
+
+      setState(() {
+        _selectedCategory = 'Food';
+        _selectedDate = DateTime.now();
+      });
+      Navigator.pushReplacementNamed(context, '/home');
+    } else {
+      showSnackBar(context, 'Failed to add expense',
+          backgroundColor: Colors.red);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Add Expense'),
-      ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Form(
@@ -62,43 +70,49 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
             children: [
               TextFormField(
                 controller: _amountController,
-                decoration: InputDecoration(labelText: 'amount'),
+                decoration: const InputDecoration(labelText: 'Amount'),
                 keyboardType: TextInputType.number,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Please enter an amount';
                   }
-                  return null;
-                },
-              ),
-              TextFormField(
-                controller: _categoryController,
-                decoration: InputDecoration(labelText: 'Category'),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter a category';
+                  if (double.tryParse(value) == null) {
+                    return 'Please enter a valid number';
                   }
                   return null;
                 },
               ),
-              TextFormField(
-                controller: _dateController,
-                decoration:
-                    const InputDecoration(labelText: 'Date (YYYY-MM-DD)'),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter a date';
-                  }
-                  return null;
-                },
+              const SizedBox(height: 10),
+              DropdownButtonFormField<String>(
+                value: _selectedCategory,
+                items: ['Food', 'Transport', 'Entertainment', 'Others']
+                    .map((category) => DropdownMenuItem(
+                        value: category, child: Text(category)))
+                    .toList(),
+                decoration: const InputDecoration(labelText: 'Category'),
+                onChanged: (newValue) =>
+                    setState(() => _selectedCategory = newValue!),
               ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Text(
+                      'Date: ${DateFormat('yyyy-MM-dd').format(_selectedDate)}'),
+                  IconButton(
+                      onPressed: () => _selectDate(context),
+                      icon: const Icon(Icons.calendar_today))
+                ],
+              ),
+              const SizedBox(height: 10),
               TextFormField(
                 controller: _notesController,
-                decoration: InputDecoration(labelText: 'Notes (optional)'),
+                decoration:
+                    const InputDecoration(labelText: 'Notes (optional)'),
+                maxLines: 3,
               ),
               const SizedBox(height: 20),
               ElevatedButton(
-                onPressed: _addExpense,
+                onPressed: _submitExpense,
                 child: const Text('Add Expense'),
               ),
             ],
