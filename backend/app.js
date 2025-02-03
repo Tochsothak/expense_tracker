@@ -11,6 +11,10 @@ const app = express();
 const authRoutes = require('./routes/auth')
 app.use('/api/auth', authRoutes)
 
+const expenseRoutes = require('./routes/expense');
+
+app.use('/api/expense', expenseRoutes);
+
 app.use(cors()); //  enable cors for all route(cross origin)
 app.use(express.json());
 

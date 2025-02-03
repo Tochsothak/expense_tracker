@@ -19,6 +19,14 @@ class _SignupScreenState extends State<SignupScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
+  // @override
+  // void dispose() {
+  //   _usernameController.dispose();
+  //   _emailController.dispose();
+  //   _passwordController.dispose();
+  //   super.dispose();
+  // }
+
   Future<void> _signUp() async {
     if (_formKey.currentState!.validate()) {
       final response = await http.post(
